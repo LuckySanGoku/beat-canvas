@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import type { Beat, Shot } from '../types';
+import { persist } from 'zustand/middleware';
+import type { Beat, Shot, GeneratedVersion } from '../types';
 import { beats } from '../data/beats';
 
 interface ProjectStore {
@@ -20,12 +21,20 @@ interface ProjectStore {
   splitShotAtFrame: (shotId: string, frameIndex: number) => void;
   // Delete shot
   deleteShot: (shotId: string) => void;
+  // Upload generated version
+  uploadGeneratedVersion: (shotId: string, file: File) => Promise<void>;
+  // Set active version
+  setActiveVersion: (shotId: string, version: number | null) => void;
+  // Delete generated version
+  deleteGeneratedVersion: (shotId: string, version: number) => void;
 }
 
-export const useProjectStore = create<ProjectStore>((set) => ({
-  beats: beats,
-  showReferences: true,
-  toggleReferences: () => set((state) => ({ showReferences: !state.showReferences })),
+export const useProjectStore = create<ProjectStore>()(
+  persist(
+    (set) => ({
+      beats: beats,
+      showReferences: true,
+      toggleReferences: () => set((state) => ({ showReferences: !state.showReferences })),
   
   reorderShotsInBeat: (beatId, startIndex, endIndex) => {
     set((state) => {
@@ -362,45 +371,79 @@ export const useProjectStore = create<ProjectStore>((set) => ({
     });
   },
 
-  // Move a frame index from one shot to another
+  // Move a frame index from one shot to another (works across beats)
   moveFrameIndexToShot: (frameIndex, fromShotId, toShotId) => {
     set((state) => {
+      // Find source and target beats
+      let fromBeat: Beat | undefined;
+      let toBeat: Beat | undefined;
+      let fromShot: Shot | undefined;
+      let toShot: Shot | undefined;
+      
+      for (const beat of state.beats) {
+        const shot = beat.shots.find((s) => s.shot_id === fromShotId);
+        if (shot) {
+          fromBeat = beat;
+          fromShot = shot;
+        }
+        const targetShot = beat.shots.find((s) => s.shot_id === toShotId);
+        if (targetShot) {
+          toBeat = beat;
+          toShot = targetShot;
+        }
+      }
+      
+      if (!fromShot || !toShot || !fromBeat || !toBeat) {
+        return { beats: state.beats };
+      }
+      
+      // Remove frame index from source shot
+      const fromFrameIndices = fromShot.frame_indices || [];
+      const updatedFromIndices = fromFrameIndices.filter((idx) => idx !== frameIndex);
+      
+      // Add frame index to target shot (sorted)
+      const toFrameIndices = toShot.frame_indices || [];
+      const updatedToIndices = [...toFrameIndices, frameIndex].sort((a, b) => a - b);
+      
+      // Update beats
       const newBeats = state.beats.map((beat) => {
-        const fromShot = beat.shots.find((s) => s.shot_id === fromShotId);
-        const toShot = beat.shots.find((s) => s.shot_id === toShotId);
+        if (beat.beat_id === fromBeat.beat_id) {
+          // Update source beat - remove frame from source shot
+          const updatedShots = beat.shots.map((shot) => {
+            if (shot.shot_id === fromShotId) {
+              return { ...shot, frame_indices: updatedFromIndices.length > 0 ? updatedFromIndices : undefined };
+            }
+            return shot;
+          });
+          
+          // Renumber all shots in the source beat
+          const renumberedShots = updatedShots.map((shot, index) => ({
+            ...shot,
+            position_in_beat: index + 1,
+          }));
+          
+          return { ...beat, shots: renumberedShots };
+        }
         
-        if (!fromShot || !toShot) return beat;
+        if (beat.beat_id === toBeat.beat_id) {
+          // Update target beat - add frame to target shot
+          const updatedShots = beat.shots.map((shot) => {
+            if (shot.shot_id === toShotId) {
+              return { ...shot, frame_indices: updatedToIndices };
+            }
+            return shot;
+          });
+          
+          // Renumber all shots in the target beat
+          const renumberedShots = updatedShots.map((shot, index) => ({
+            ...shot,
+            position_in_beat: index + 1,
+          }));
+          
+          return { ...beat, shots: renumberedShots };
+        }
         
-        // Remove frame index from source shot
-        const fromFrameIndices = fromShot.frame_indices || [];
-        const updatedFromIndices = fromFrameIndices.filter((idx) => idx !== frameIndex);
-        
-        // Add frame index to target shot (sorted)
-        const toFrameIndices = toShot.frame_indices || [];
-        const updatedToIndices = [...toFrameIndices, frameIndex].sort((a, b) => a - b);
-        
-        // Update shots
-        const updatedShots = beat.shots.map((shot) => {
-          if (shot.shot_id === fromShotId) {
-            // If source shot has no frames left, keep it but with empty frame_indices
-            return { ...shot, frame_indices: updatedFromIndices.length > 0 ? updatedFromIndices : undefined };
-          }
-          if (shot.shot_id === toShotId) {
-            return { ...shot, frame_indices: updatedToIndices };
-          }
-          return shot;
-        });
-        
-        // Renumber all shots in the beat
-        const renumberedShots = updatedShots.map((shot, index) => ({
-          ...shot,
-          position_in_beat: index + 1,
-        }));
-        
-        return {
-          ...beat,
-          shots: renumberedShots,
-        };
+        return beat;
       });
       
       return { beats: newBeats };
@@ -533,5 +576,104 @@ export const useProjectStore = create<ProjectStore>((set) => ({
       return { beats: newBeats };
     });
   },
-}));
+
+  // Upload a generated version for a shot
+  uploadGeneratedVersion: async (shotId, file) => {
+    // Convert file to base64 data URL for storage
+    const reader = new FileReader();
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+    set((state) => {
+      const newBeats = state.beats.map((beat) => ({
+        ...beat,
+        shots: beat.shots.map((shot) => {
+          if (shot.shot_id !== shotId) return shot;
+
+          // Find the next version number
+          const nextVersion = shot.generated_versions.length > 0
+            ? Math.max(...shot.generated_versions.map(v => v.version)) + 1
+            : 1;
+
+          // Create new generated version
+          const newVersion: GeneratedVersion = {
+            version: nextVersion,
+            prompt: '',
+            file: dataUrl, // Store as base64 data URL
+            thumbnail: dataUrl, // Use same image as thumbnail for now
+            duration: 0,
+            timestamp: new Date().toISOString(),
+            notes: '',
+          };
+
+          return {
+            ...shot,
+            generated_versions: [...shot.generated_versions, newVersion],
+            active_version: shot.active_version ?? nextVersion, // Set as active if none selected
+          };
+        }),
+      }));
+
+      return { beats: newBeats };
+    });
+  },
+
+  // Set the active version for a shot
+  setActiveVersion: (shotId, version) => {
+    set((state) => {
+      const newBeats = state.beats.map((beat) => ({
+        ...beat,
+        shots: beat.shots.map((shot) =>
+          shot.shot_id === shotId
+            ? { ...shot, active_version: version }
+            : shot
+        ),
+      }));
+
+      return { beats: newBeats };
+    });
+  },
+
+  // Delete a generated version
+  deleteGeneratedVersion: (shotId, version) => {
+    set((state) => {
+      const newBeats = state.beats.map((beat) => ({
+        ...beat,
+        shots: beat.shots.map((shot) => {
+          if (shot.shot_id !== shotId) return shot;
+
+          // Remove the version
+          const updatedVersions = shot.generated_versions.filter(v => v.version !== version);
+          
+          // If this was the active version, clear it or set to another version
+          let newActiveVersion = shot.active_version;
+          if (shot.active_version === version) {
+            newActiveVersion = updatedVersions.length > 0 ? updatedVersions[0].version : null;
+          }
+
+          return {
+            ...shot,
+            generated_versions: updatedVersions,
+            active_version: newActiveVersion,
+          };
+        }),
+      }));
+
+      return { beats: newBeats };
+    });
+  },
+    }),
+    {
+      name: 'beat-canvas-storage', // unique name for localStorage key
+      // Only persist beats and showReferences, not functions
+      partialize: (state) => ({
+        beats: state.beats,
+        showReferences: state.showReferences,
+      }),
+    }
+  )
+);
 

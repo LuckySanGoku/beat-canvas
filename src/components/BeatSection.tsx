@@ -66,4 +66,3 @@ export function BeatSection({ beat, showReference, previousBeatsShots }: BeatSec
     </div>
   );
 }
-
