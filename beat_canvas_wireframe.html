@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Beat Canvas - Layout Wireframe</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a1a;
+            color: #e0e0e0;
+            padding: 20px;
+        }
+        
+        .header {
+            max-width: 1400px;
+            margin: 0 auto 30px;
+            padding: 20px;
+            background: #252525;
+            border-radius: 8px;
+        }
+        
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        
+        .header .controls {
+            display: flex;
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .toggle-btn {
+            padding: 8px 16px;
+            background: #3a3a3a;
+            border: 1px solid #555;
+            border-radius: 4px;
+            color: #e0e0e0;
+            cursor: pointer;
+        }
+        
+        .toggle-btn.active {
+            background: #0066cc;
+            border-color: #0066cc;
+        }
+        
+        .beat-section {
+            max-width: 1400px;
+            margin: 0 auto 40px;
+            background: #252525;
+            border-radius: 8px;
+            padding: 20px;
+        }
+        
+        .beat-header {
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #3a3a3a;
+        }
+        
+        .beat-header h2 {
+            font-size: 24px;
+            margin-bottom: 8px;
+            color: #4a9eff;
+        }
+        
+        .beat-meta {
+            display: flex;
+            gap: 20px;
+            font-size: 14px;
+            color: #999;
+        }
+        
+        .shot-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+        }
+        
+        .shot-card {
+            background: #2a2a2a;
+            border-radius: 6px;
+            overflow: hidden;
+            border: 1px solid #3a3a3a;
+        }
+        
+        .shot-thumbnail {
+            width: 100%;
+            aspect-ratio: 16/9;
+            background: #1a1a1a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #666;
+            font-size: 12px;
+        }
+        
+        .shot-thumbnail img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .shot-info {
+            padding: 12px;
+        }
+        
+        .shot-number {
+            font-size: 12px;
+            color: #4a9eff;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+        
+        .shot-description {
+            font-size: 13px;
+            line-height: 1.4;
+            margin-bottom: 10px;
+            color: #ccc;
+        }
+        
+        .shot-details {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            font-size: 11px;
+        }
+        
+        .detail-tag {
+            background: #3a3a3a;
+            padding: 3px 8px;
+            border-radius: 3px;
+            color: #999;
+        }
+        
+        .reference-section {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #3a3a3a;
+        }
+        
+        .reference-label {
+            font-size: 11px;
+            color: #888;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+        
+        .reference-thumbnails {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        
+        .ref-thumb {
+            width: 60px;
+            height: 34px;
+            background: #1a1a1a;
+            border-radius: 3px;
+            border: 1px solid #444;
+        }
+        
+        .ref-thumb img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    
+    <div class="header">
+        <h1>Beat Canvas - Teeth Brushing Commercial</h1>
+        <p>Shot-by-shot transposition workspace</p>
+        <div class="controls">
+            <button class="toggle-btn active">Show Reference Shots</button>
+            <button class="toggle-btn">Compact View</button>
+        </div>
+    </div>
+
+    <!-- BEAT 1 EXAMPLE -->
+    <div class="beat-section">
+        <div class="beat-header">
+            <h2>Beat 1: THE SETUP</h2>
+            <div class="beat-meta">
+                <span>Duration: 8.5s</span>
+                <span>11 shots</span>
+                <span>Energy: Intriguing/mysterious</span>
+            </div>
+        </div>
+        
+        <div class="shot-grid">
+            
+            <!-- SHOT CARD 1 -->
+            <div class="shot-card">
+                <div class="shot-thumbnail">
+                    <img src="#" alt="Shot placeholder">
+                    <!-- Image goes here -->
+                </div>
+                <div class="shot-info">
+                    <div class="shot-number">SHOT 1.1</div>
+                    <div class="shot-description">
+                        Extreme close-up: Water droplet hitting white surface
+                    </div>
+                    <div class="shot-details">
+                        <span class="detail-tag">0.5s</span>
+                        <span class="detail-tag">ECU</span>
+                        <span class="detail-tag">Static</span>
+                    </div>
+                    
+                    <!-- REFERENCE SECTION (toggleable) -->
+                    <div class="reference-section">
+                        <div class="reference-label">↓ Lurpak Reference</div>
+                        <div class="reference-thumbnails">
+                            <div class="ref-thumb">
+                                <!-- Small ref image -->
+                            </div>
+                            <div class="ref-thumb">
+                                <!-- Small ref image -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- SHOT CARD 2 -->
+            <div class="shot-card">
+                <div class="shot-thumbnail">
+                    [Thumbnail Image]
+                </div>
+                <div class="shot-info">
+                    <div class="shot-number">SHOT 1.2</div>
+                    <div class="shot-description">
+                        Wide static: Bathroom sink, toothbrush visible
+                    </div>
+                    <div class="shot-details">
+                        <span class="detail-tag">1.2s</span>
+                        <span class="detail-tag">Wide</span>
+                        <span class="detail-tag">Static</span>
+                    </div>
+                    <div class="reference-section">
+                        <div class="reference-label">↓ Lurpak Reference</div>
+                        <div class="reference-thumbnails">
+                            <div class="ref-thumb"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- SHOT CARD 3 -->
+            <div class="shot-card">
+                <div class="shot-thumbnail">
+                    [Thumbnail Image]
+                </div>
+                <div class="shot-info">
+                    <div class="shot-number">SHOT 1.3</div>
+                    <div class="shot-description">
+                        Close-up: Hand turning on faucet, water starting
+                    </div>
+                    <div class="shot-details">
+                        <span class="detail-tag">0.8s</span>
+                        <span class="detail-tag">CU</span>
+                        <span class="detail-tag">Tilt down</span>
+                    </div>
+                    <div class="reference-section">
+                        <div class="reference-label">↓ Lurpak Reference</div>
+                        <div class="reference-thumbnails">
+                            <div class="ref-thumb"></div>
+                            <div class="ref-thumb"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Additional shots continue in grid... -->
+            <div class="shot-card">
+                <div class="shot-thumbnail">[Shot 1.4]</div>
+                <div class="shot-info">
+                    <div class="shot-number">SHOT 1.4</div>
+                    <div class="shot-description">Shot description here...</div>
+                    <div class="shot-details">
+                        <span class="detail-tag">Duration</span>
+                        <span class="detail-tag">Type</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="shot-card">
+                <div class="shot-thumbnail">[Shot 1.5]</div>
+                <div class="shot-info">
+                    <div class="shot-number">SHOT 1.5</div>
+                    <div class="shot-description">Shot description here...</div>
+                    <div class="shot-details">
+                        <span class="detail-tag">Duration</span>
+                        <span class="detail-tag">Type</span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- BEAT 2 EXAMPLE -->
+    <div class="beat-section">
+        <div class="beat-header">
+            <h2>Beat 2: THE MUNDANE FOIL</h2>
+            <div class="beat-meta">
+                <span>Duration: 6.3s</span>
+                <span>6 shots</span>
+                <span>Energy: Calm/grounded</span>
+            </div>
+        </div>
+        
+        <div class="shot-grid">
+            <div class="shot-card">
+                <div class="shot-thumbnail">[Shot 2.1]</div>
+                <div class="shot-info">
+                    <div class="shot-number">SHOT 2.1</div>
+                    <div class="shot-description">Static wide: Man at mirror...</div>
+                    <div class="shot-details">
+                        <span class="detail-tag">2.1s</span>
+                        <span class="detail-tag">Wide</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="shot-card">
+                <div class="shot-thumbnail">[Shot 2.2]</div>
+                <div class="shot-info">
+                    <div class="shot-number">SHOT 2.2</div>
+                    <div class="shot-description">Medium: Man examining teeth...</div>
+                    <div class="shot-details">
+                        <span class="detail-tag">1.8s</span>
+                        <span class="detail-tag">Medium</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div style="max-width: 1400px; margin: 40px auto; padding: 20px; background: #252525; border-radius: 8px;">
+        <h3 style="margin-bottom: 15px;">Key Layout Principles:</h3>
+        <ul style="line-height: 1.8; color: #ccc;">
+            <li><strong>Grid Layout:</strong> Responsive cards, 3-4 per row on desktop, stack on mobile</li>
+            <li><strong>Thumbnail First:</strong> Large 16:9 image at top of each card</li>
+            <li><strong>Clean Hierarchy:</strong> Shot number → Description → Details → References</li>
+            <li><strong>Consistent Spacing:</strong> 20px gaps between cards, 12px padding inside</li>
+            <li><strong>Toggleable References:</strong> Show/hide Lurpak reference thumbnails</li>
+            <li><strong>Dark Theme:</strong> Easy on eyes for long editing sessions</li>
+        </ul>
+    </div>
+
+</body>
+</html>
