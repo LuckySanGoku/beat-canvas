@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Beat, Shot, GeneratedVersion } from '../types';
+import type { Beat, Shot, GeneratedVersion, CustomReference } from '../types';
 import { beats } from '../data/beats';
 
 interface ProjectStore {
@@ -27,6 +27,10 @@ interface ProjectStore {
   setActiveVersion: (shotId: string, version: number | null) => void;
   // Delete generated version
   deleteGeneratedVersion: (shotId: string, version: number) => void;
+  // Upload custom reference image
+  uploadCustomReference: (shotId: string, file: File) => Promise<void>;
+  // Delete custom reference
+  deleteCustomReference: (shotId: string, referenceId: string) => void;
 }
 
 export const useProjectStore = create<ProjectStore>()(
@@ -662,6 +666,61 @@ export const useProjectStore = create<ProjectStore>()(
         }),
       }));
 
+      return { beats: newBeats };
+    });
+  },
+
+  // Upload a custom reference image
+  uploadCustomReference: async (shotId, file) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    return new Promise<void>((resolve) => {
+      reader.onload = () => {
+        const base64 = reader.result as string;
+        set((state) => {
+          const newBeats = state.beats.map((beat) => ({
+            ...beat,
+            shots: beat.shots.map((shot) => {
+              if (shot.shot_id === shotId) {
+                const customRefs = shot.custom_references || [];
+                const newRef: CustomReference = {
+                  id: `custom_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                  file: base64,
+                  thumbnail: base64, // For now, thumbnail is the same as file
+                };
+                return {
+                  ...shot,
+                  custom_references: [...customRefs, newRef],
+                };
+              }
+              return shot;
+            }),
+          }));
+          return { beats: newBeats };
+        });
+        resolve();
+      };
+    });
+  },
+
+  // Delete a custom reference
+  deleteCustomReference: (shotId, referenceId) => {
+    set((state) => {
+      const newBeats = state.beats.map((beat) => ({
+        ...beat,
+        shots: beat.shots.map((shot) => {
+          if (shot.shot_id === shotId) {
+            const updatedRefs = (shot.custom_references || []).filter(
+              (ref) => ref.id !== referenceId
+            );
+            return {
+              ...shot,
+              custom_references: updatedRefs.length > 0 ? updatedRefs : undefined,
+            };
+          }
+          return shot;
+        }),
+      }));
       return { beats: newBeats };
     });
   },

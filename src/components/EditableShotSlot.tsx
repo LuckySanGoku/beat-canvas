@@ -3,7 +3,7 @@ import { useDroppable } from '@dnd-kit/core';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { Shot } from '../types';
-import { getFramePaths, getPrimaryFramePath, getFramePathByIndex } from '../utils/frameMapping';
+import { getFramePaths, getFramePathByIndex } from '../utils/frameMapping';
 import { useProjectStore } from '../stores/projectStore';
 import { DraggableReferenceFrame } from './DraggableReferenceFrame';
 
@@ -20,12 +20,28 @@ export function EditableShotSlot({ shot, showReference }: EditableShotSlotProps)
   const [tempShotNumber, setTempShotNumber] = useState(shot.custom_shot_number || `${shot.beat}.${shot.position_in_beat}`);
   const [tempTag, setTempTag] = useState('');
   const [selectedReferenceFrameIndex, setSelectedReferenceFrameIndex] = useState<number | null>(null);
+  const [selectedCustomReferenceId, setSelectedCustomReferenceId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const customRefInputRef = useRef<HTMLInputElement>(null);
   
   // Update tempShotNumber when shot changes
   useEffect(() => {
     setTempShotNumber(shot.custom_shot_number || `${shot.beat}.${shot.position_in_beat}`);
   }, [shot.custom_shot_number, shot.beat, shot.position_in_beat]);
+  
+  // Set default to first reference frame when shot changes
+  useEffect(() => {
+    // Only set default if nothing is currently selected and no active generated version
+    if (shot.active_version === null && selectedReferenceFrameIndex === null && selectedCustomReferenceId === null) {
+      if (shot.frame_indices && shot.frame_indices.length > 0) {
+        // Default to first lurpak reference frame
+        setSelectedReferenceFrameIndex(0);
+      } else if (shot.custom_references && shot.custom_references.length > 0) {
+        // If no lurpak references, default to first custom reference
+        setSelectedCustomReferenceId(shot.custom_references[0].id);
+      }
+    }
+  }, [shot.shot_id]); // Only when shot ID changes (different shot)
   
   const {
     attributes: sortableAttributes,
@@ -79,13 +95,14 @@ export function EditableShotSlot({ shot, showReference }: EditableShotSlotProps)
     uploadGeneratedVersion,
     setActiveVersion,
     deleteGeneratedVersion,
+    uploadCustomReference,
+    deleteCustomReference,
   } = useProjectStore();
   
   const displayShotNumber = shot.custom_shot_number || `${shot.beat}.${shot.position_in_beat}`;
   
   // Get frame paths for this shot (supports multiple keyframes)
   const referenceFramePaths = getFramePaths(shot);
-  const primaryFramePath = getPrimaryFramePath(shot);
   const hasNoReferences = !shot.frame_indices || shot.frame_indices.length === 0;
 
   // Determine which image to show in placeholder
@@ -93,10 +110,23 @@ export function EditableShotSlot({ shot, showReference }: EditableShotSlotProps)
     ? shot.generated_versions.find(v => v.version === shot.active_version)
     : null;
   
-  // If a reference frame is selected, use that; otherwise use active generated version or primary frame
-  const displayImagePath = selectedReferenceFrameIndex !== null && shot.frame_indices
-    ? getFramePathByIndex(shot.frame_indices[selectedReferenceFrameIndex])
-    : activeGeneratedVersion?.thumbnail || primaryFramePath;
+  // Determine which image to display in the main thumbnail area
+  // Priority: selected custom ref > selected lurpak ref > active generated version > first lurpak ref > first custom ref
+  let displayImagePath: string | undefined;
+  if (selectedCustomReferenceId !== null) {
+    const customRef = shot.custom_references?.find(r => r.id === selectedCustomReferenceId);
+    displayImagePath = customRef?.thumbnail;
+  } else if (selectedReferenceFrameIndex !== null && shot.frame_indices && shot.frame_indices[selectedReferenceFrameIndex] !== undefined) {
+    displayImagePath = getFramePathByIndex(shot.frame_indices[selectedReferenceFrameIndex]);
+  } else if (activeGeneratedVersion?.thumbnail) {
+    displayImagePath = activeGeneratedVersion.thumbnail;
+  } else if (shot.frame_indices && shot.frame_indices.length > 0) {
+    // Default to first lurpak reference frame
+    displayImagePath = getFramePathByIndex(shot.frame_indices[0]);
+  } else if (shot.custom_references && shot.custom_references.length > 0) {
+    // Default to first custom reference
+    displayImagePath = shot.custom_references[0].thumbnail;
+  }
   
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -146,27 +176,32 @@ export function EditableShotSlot({ shot, showReference }: EditableShotSlotProps)
         isOver ? 'border-[#4a9eff] ring-2 ring-[#4a9eff]' : 'border-[#3a3a3a]'
       } cursor-grab active:cursor-grabbing relative`}
       {...sortableAttributes}
-      {...(sortableListeners ? Object.fromEntries(
-        Object.entries(sortableListeners).map(([key, value]) => {
-          if (key === 'onPointerDown') {
-            return [key, (e: React.PointerEvent) => {
-              // Don't activate sortable if clicking on reference frame, delete button, or upload button
-              const target = e.target as HTMLElement;
-              if (target.closest('[data-reference-frame]') || 
-                  target.closest('[data-delete-shot]') || 
-                  target.closest('[data-upload-button]') ||
-                  target.closest('[data-delete-version]')) {
-                return;
-              }
-              // Call original handler
-              if (typeof value === 'function') {
-                value(e as any);
-              }
-            }];
+      {...(sortableListeners ? {
+        ...sortableListeners,
+        onPointerDown: (e: React.PointerEvent) => {
+          // Don't activate sortable if clicking on interactive elements
+          const target = e.target as HTMLElement;
+          if (
+            target.closest('[data-reference-frame]') || 
+            target.closest('[data-delete-shot]') || 
+            target.closest('[data-upload-button]') ||
+            target.closest('[data-delete-version]') ||
+            target.closest('[data-upload-reference]') ||
+            target.closest('[data-delete-custom-reference]') ||
+            target.closest('button') ||
+            target.closest('input') ||
+            target.tagName === 'BUTTON' ||
+            target.tagName === 'INPUT'
+          ) {
+            e.stopPropagation();
+            return;
           }
-          return [key, value];
-        })
-      ) : {})}
+          // Call original handler
+          if (sortableListeners.onPointerDown) {
+            sortableListeners.onPointerDown(e);
+          }
+        }
+      } : {})}
     >
       {/* Delete button - only show if shot has no references */}
       {hasNoReferences && (
@@ -228,10 +263,12 @@ export function EditableShotSlot({ shot, showReference }: EditableShotSlotProps)
       {/* Drop zone overlay for reference frames - shows feedback when dragging (add to shot) */}
       {/* This zone must always be active to receive drops, but only show visual feedback when hovered */}
       {/* Use clipPath to exclude top corners where insert-before/after zones are */}
+      {/* IMPORTANT: z-10 is lower than buttons (z-20+) so buttons remain clickable */}
+      {/* Drop zone - dnd-kit can detect drops even with pointer-events-none via the ref */}
       <div
         ref={setDroppableRef}
-        className={`absolute inset-0 z-10 transition-all pointer-events-auto ${
-          isOver ? 'bg-[#4a9eff]/20 border-2 border-dashed border-[#4a9eff] rounded' : ''
+        className={`absolute inset-0 z-10 transition-all ${
+          isOver ? 'bg-[#4a9eff]/20 border-2 border-dashed border-[#4a9eff] rounded pointer-events-auto' : 'pointer-events-none'
         }`}
         style={{
           // Exclude top corners where insert-before/after zones are (top 64px)
@@ -274,7 +311,7 @@ export function EditableShotSlot({ shot, showReference }: EditableShotSlotProps)
       </div>
       
       {/* Shot info */}
-      <div className="p-3" onDoubleClick={() => setIsEditing(!isEditing)}>
+      <div className="p-3 relative z-20" onDoubleClick={() => setIsEditing(!isEditing)}>
         {/* Shot number - editable */}
         {editingField === 'shotNumber' ? (
           <div className="mb-1.5">
@@ -533,7 +570,7 @@ export function EditableShotSlot({ shot, showReference }: EditableShotSlotProps)
                           e.stopPropagation();
                           e.preventDefault();
                         }}
-                        className="absolute top-0 right-0 w-4 h-4 bg-red-600 hover:bg-red-700 text-white rounded-bl text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-auto z-10"
+                        className="absolute top-0 right-0 w-4 h-4 bg-red-600 hover:bg-red-700 text-white rounded-bl text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-auto z-40"
                         title="Delete version"
                       >
                         ×
@@ -545,12 +582,46 @@ export function EditableShotSlot({ shot, showReference }: EditableShotSlotProps)
             )}
 
             {/* Reference section (toggleable) */}
-            {showReference && referenceFramePaths.length > 0 && (
-              <div className="mt-4 pt-4 border-t border-[#3a3a3a]">
-                <div className="text-[11px] text-[#888] font-semibold mb-2">
-                  ↓ Lurpak Reference (click to preview, drag to move between shots)
+            {(showReference && (referenceFramePaths.length > 0 || (shot.custom_references && shot.custom_references.length > 0))) && (
+              <div className="mt-4 pt-4 border-t border-[#3a3a3a] relative z-20">
+                <div className="text-[11px] text-[#888] font-semibold mb-2 flex items-center justify-between">
+                  <span>↓ Lurpak Reference (click to preview, drag to move between shots)</span>
+                  <input
+                    ref={customRefInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        await uploadCustomReference(shot.shot_id, file);
+                        e.target.value = ''; // Clear input
+                      }
+                    }}
+                    className="hidden"
+                  />
+                  <button
+                    data-upload-reference="true"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      customRefInputRef.current?.click();
+                    }}
+                    onPointerDown={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                    }}
+                    onMouseDown={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                    }}
+                    className="text-[10px] px-2 py-1 bg-[#3a3a3a] hover:bg-[#4a4a4a] text-[#ccc] rounded border border-[#555] transition-colors pointer-events-auto relative z-40"
+                    title="Upload custom reference image"
+                  >
+                    + Upload Reference
+                  </button>
                 </div>
                 <div className="flex gap-2 flex-wrap">
+                  {/* Lurpak reference frames */}
                   {shot.frame_indices?.map((frameIndex, index) => (
                     <DraggableReferenceFrame
                       key={frameIndex}
@@ -559,10 +630,63 @@ export function EditableShotSlot({ shot, showReference }: EditableShotSlotProps)
                       shotId={shot.shot_id}
                       onSelect={() => {
                         setSelectedReferenceFrameIndex(index);
+                        setSelectedCustomReferenceId(null); // Clear custom reference selection
                         setActiveVersion(shot.shot_id, null); // Clear active generated version when selecting reference
                       }}
-                      isSelected={selectedReferenceFrameIndex === index}
+                      isSelected={selectedReferenceFrameIndex === index && selectedCustomReferenceId === null}
                     />
+                  ))}
+                  {/* Custom uploaded references */}
+                  {shot.custom_references?.map((customRef) => (
+                    <div
+                      key={customRef.id}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedCustomReferenceId(customRef.id);
+                        setSelectedReferenceFrameIndex(null); // Clear lurpak reference selection
+                        setActiveVersion(shot.shot_id, null); // Clear active generated version
+                      }}
+                      className={`w-[60px] h-[34px] bg-[#1a1a1a] rounded border overflow-hidden cursor-pointer hover:border-[#4a9eff] transition-colors relative group ${
+                        selectedCustomReferenceId === customRef.id ? 'border-[#4a9eff] ring-2 ring-[#4a9eff]' : 'border-[#444]'
+                      }`}
+                      title="Click to preview"
+                    >
+                      <img
+                        src={customRef.thumbnail}
+                        alt="Custom reference"
+                        className="w-full h-full object-cover rounded pointer-events-none"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                        draggable={false}
+                      />
+                      {/* Delete button */}
+                      <button
+                        data-delete-custom-reference="true"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          if (confirm('Delete this custom reference?')) {
+                            deleteCustomReference(shot.shot_id, customRef.id);
+                            if (selectedCustomReferenceId === customRef.id) {
+                              setSelectedCustomReferenceId(null);
+                            }
+                          }
+                        }}
+                        onPointerDown={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                        }}
+                        onMouseDown={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                        }}
+                        className="absolute top-0 right-0 w-4 h-4 bg-red-600 hover:bg-red-700 text-white rounded-full flex items-center justify-center text-[8px] font-bold opacity-0 group-hover:opacity-100 transition-opacity pointer-events-auto z-40"
+                        title="Delete custom reference"
+                      >
+                        ×
+                      </button>
+                    </div>
                   ))}
                 </div>
               </div>

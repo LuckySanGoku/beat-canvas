@@ -60,18 +60,14 @@ export function BeatTimeline() {
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     
-    setActiveShot(null);
-    setActiveFrame(null);
-    
-    if (!over) {
-      return;
-    }
-    
     // Check if this is a reference frame drag
     const activeData = active.data.current;
     if (activeData?.type === 'reference-frame') {
-      // If dropped on the same element, it's a click - ignore (let onClick handle it)
-      if (active.id === over.id) {
+      // CRITICAL: If no drop target OR dropped on the same element, it's a click - ignore completely
+      // This prevents clicks from accidentally creating shots
+      if (!over || active.id === over.id) {
+        setActiveShot(null);
+        setActiveFrame(null);
         return;
       }
       
